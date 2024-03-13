@@ -28,21 +28,11 @@ Device::Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight) :
     QueryMSAA();
     QueryDescriptorSizes();
     CreateCommandObjects();
-
-    ThrowIfFailed(_commandList->Reset(_commandAllocator.Get(), nullptr));
-
     CreateSwapChain();
     CreateDescriptorHeaps();
     CreateRenderTargetViews();
-    CreateDepthStencilView();
-    SetViewport();
 
-    ThrowIfFailed(_commandList->Close());
-
-    ID3D12CommandList* cmdsList[] = { _commandList.Get() };
-    _commandQueue->ExecuteCommandLists(std::size(cmdsList), cmdsList);
-
-    FlushCommandQueue();
+    OnResize();
 }
 
 Device::~Device()
@@ -82,7 +72,7 @@ void Device::Draw()
     ThrowIfFailed(_commandList->Close());
 
     ID3D12CommandList* cmdsList[] = { _commandList.Get() };
-    _commandQueue->ExecuteCommandLists(std::size(cmdsList), cmdsList);
+    _commandQueue->ExecuteCommandLists(static_cast<uint32_t>(std::size(cmdsList)), cmdsList);
 
     ThrowIfFailed(_swapChain->Present(0, 0));
     _currentBackBuffer = (_currentBackBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
@@ -276,6 +266,43 @@ void Device::FlushCommandQueue()
         WaitForSingleObject(eventHandle, INFINITE);
         CloseHandle(eventHandle);
     }
+}
+
+void Device::OnResize()
+{
+    assert(_device);
+    assert(_swapChain);
+    assert(_commandAllocator);
+
+    FlushCommandQueue();
+
+    ThrowIfFailed(_commandList->Reset(_commandAllocator.Get(), nullptr));
+
+    for (size_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
+        _swapChainBuffer[i].Reset();
+    _depthStencilBuffer.Reset();
+
+    ThrowIfFailed(_swapChain->ResizeBuffers(SWAP_CHAIN_BUFFER_COUNT, _clientWidth, _clientHeight, _backBufferFormat, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
+
+    _currentBackBuffer = 0;
+
+    CreateRenderTargetViews();
+    CreateDepthStencilView();
+    
+    ThrowIfFailed(_commandList->Close());
+
+    ID3D12CommandList* cmdsList[] = { _commandList.Get() };
+    _commandQueue->ExecuteCommandLists(static_cast<uint32_t>(std::size(cmdsList)), cmdsList);
+
+    FlushCommandQueue();
+
+    _screenViewport.TopLeftX = 0;
+    _screenViewport.TopLeftY = 0;
+    _screenViewport.Width = static_cast<float>(_clientWidth);
+    _screenViewport.Height = static_cast<float>(_clientHeight);
+    _screenViewport.MinDepth = 0.0f;
+    _screenViewport.MaxDepth = 0.0f;
+    _scissorRect = { 0, 0, static_cast<long>(_clientWidth), static_cast<long>(_clientHeight) };
 }
 
 ID3D12Resource* Device::CurrentBackBuffer() const

@@ -9,6 +9,8 @@ using Microsoft::WRL::ComPtr;
 
 constexpr uint32_t SWAP_CHAIN_BUFFER_COUNT = 2;
 
+class App;
+
 class Device
 {
 public:
@@ -18,6 +20,8 @@ public:
     void Draw();
 
 private:
+    friend App;
+
     void EnableDebugLayer();
     void CreateDevice();
     void CreateFence();
@@ -31,6 +35,7 @@ private:
     void SetViewport();
 
     void FlushCommandQueue();
+    void OnResize();
 
     ID3D12Resource* CurrentBackBuffer() const;
 
