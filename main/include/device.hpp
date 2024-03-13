@@ -13,7 +13,9 @@ class Device
 {
 public:
     Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight);
+    ~Device();
 
+    void Draw();
 
 private:
     void EnableDebugLayer();
@@ -25,12 +27,20 @@ private:
     void CreateSwapChain();
     void CreateDescriptorHeaps();
     void CreateRenderTargetViews();
+    void CreateDepthStencilView();
+    void SetViewport();
+
+    void FlushCommandQueue();
+
+    ID3D12Resource* CurrentBackBuffer() const;
 
     D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView() const;
     D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView() const;
 
     ComPtr<IDXGIFactory4> _dxgiFactory;
     ComPtr<ID3D12Device> _device;
+
+    uint64_t _currentFence;
     ComPtr<ID3D12Fence1> _fence;
     
     ComPtr<ID3D12CommandQueue> _commandQueue;
@@ -56,6 +66,9 @@ private:
     
     uint32_t _currentBackBuffer = 0;
 
-    bool _4xMsaaState = false;
+    bool _4xMsaaState = true;
     uint32_t _4xMsaaQuality;
+
+    D3D12_VIEWPORT _screenViewport;
+    RECT _scissorRect;
 };
