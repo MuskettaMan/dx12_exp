@@ -2,7 +2,7 @@
 #include "device.hpp"
 #include <util.hpp>
 #include <WindowsX.h>
-#include "backends/imgui_impl_win32.h"
+#include "imgui/backends/imgui_impl_win32.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -17,7 +17,8 @@ App::App(HINSTANCE hInstance, int32_t showCommand)
         if (!InitWindowsApp(hInstance, showCommand))
             return;
 
-        _device = std::make_unique<Device>(_mainWnd, INITIAL_WIDTH, INITIAL_HEIGHT);
+        _device = std::make_shared<Device>(_mainWnd, INITIAL_WIDTH, INITIAL_HEIGHT);
+        _engine = std::make_unique<Engine>(_device);
 
         Run();
     }
@@ -98,8 +99,7 @@ int App::Run()
         else
         {
             _timer.Tick();
-
-            _device->Draw();
+            _engine->Tick();
         }
     }
 

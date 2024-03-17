@@ -2,10 +2,11 @@
 #include "util.hpp"
 #include <cassert>
 #include "d3dx12.h"
+#include "directxmath.h"
 
-#include "imgui.h"
-#include "backends/imgui_impl_win32.h"
-#include "backends/imgui_impl_dx12.h"
+#include "imgui/imgui.h"
+#include "imgui/backends/imgui_impl_win32.h"
+#include "imgui/backends/imgui_impl_dx12.h"
 
 Device::Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight) :
     _hWnd(hWnd),
@@ -68,7 +69,13 @@ void Device::Draw()
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::ShowDemoWindow();
+    using namespace DirectX;
+
+    static XMFLOAT4 c;
+    c.w = 1;
+    ImGui::Begin("Test");
+    ImGui::ColorPicker3("Clear color", &c.x);
+    ImGui::End();
 
     ImGui::Render();
     
@@ -81,12 +88,7 @@ void Device::Draw()
     _commandList->RSSetViewports(1, &_screenViewport);
     _commandList->RSSetScissorRects(1, &_scissorRect);
 
-    static float timer{ 0.0f };
-    timer += 0.0001f;
-
-    float val = sinf(timer) * 0.5f + 0.5f;
-    float color[4] = { val + 0.0f, val + 0.333f, val + 0.666f, 1.0f};
-    _commandList->ClearRenderTargetView(CurrentBackBufferView(), color, 0, nullptr);
+    _commandList->ClearRenderTargetView(CurrentBackBufferView(), &c.x, 0, nullptr);
     _commandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
   
     auto currentBackBufferView = CurrentBackBufferView();

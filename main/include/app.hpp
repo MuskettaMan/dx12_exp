@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <engine.hpp>
 #include <windows.h>
 #include <game_timer.hpp>
 
@@ -26,7 +27,8 @@ private:
 	static LRESULT WndProc(HWND hWnd, uint32_t msg, WPARAM wParam, LPARAM lParam);
 
 	HWND _mainWnd = nullptr;
-	std::unique_ptr<Device> _device;
+	std::unique_ptr<Engine> _engine;
+	std::shared_ptr<Device> _device;
 	GameTimer _timer;
 	bool _paused;
 	bool _minimized;
