@@ -3,6 +3,10 @@
 #include <cassert>
 #include "d3dx12.h"
 
+#include "imgui.h"
+#include "backends/imgui_impl_win32.h"
+#include "backends/imgui_impl_dx12.h"
+
 Device::Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight) :
     _hWnd(hWnd),
     _clientWidth(clientWidth),
@@ -23,6 +27,14 @@ Device::Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight) :
     EnableDebugLayer();
 #endif
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io{ ImGui::GetIO() };
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+    ImGui::StyleColorsDark();
+
     CreateDevice();
     CreateFence();
     QueryMSAA();
@@ -32,11 +44,18 @@ Device::Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight) :
     CreateDescriptorHeaps();
     CreateRenderTargetViews();
 
+    ImGui_ImplWin32_Init(_hWnd);
+    ImGui_ImplDX12_Init(_device.Get(), SWAP_CHAIN_BUFFER_COUNT, _backBufferFormat, _srvHeap.Get(), _srvHeap->GetCPUDescriptorHandleForHeapStart(), _srvHeap->GetGPUDescriptorHandleForHeapStart());
+
     OnResize();
 }
 
 Device::~Device()
 {
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+ 
     FlushCommandQueue();
 }
 
@@ -44,6 +63,14 @@ void Device::Draw()
 {
     ThrowIfFailed(_commandAllocator->Reset());
     ThrowIfFailed(_commandList->Reset(_commandAllocator.Get(), nullptr));
+
+    ImGui_ImplDX12_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::ShowDemoWindow();
+
+    ImGui::Render();
     
     auto barrierToRenderTarget{ CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
@@ -54,13 +81,20 @@ void Device::Draw()
     _commandList->RSSetViewports(1, &_screenViewport);
     _commandList->RSSetScissorRects(1, &_scissorRect);
 
-    float color[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+    static float timer{ 0.0f };
+    timer += 0.0001f;
+
+    float val = sinf(timer) * 0.5f + 0.5f;
+    float color[4] = { val + 0.0f, val + 0.333f, val + 0.666f, 1.0f};
     _commandList->ClearRenderTargetView(CurrentBackBufferView(), color, 0, nullptr);
     _commandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
   
     auto currentBackBufferView = CurrentBackBufferView();
     auto depthStencilView = DepthStencilView();
     _commandList->OMSetRenderTargets(1, &currentBackBufferView, true, &depthStencilView);
+
+    _commandList->SetDescriptorHeaps(1, _srvHeap.GetAddressOf());
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), _commandList.Get());
 
     auto barrierToPresent{ CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
@@ -194,6 +228,13 @@ void Device::CreateDescriptorHeaps()
     dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     dsvHeapDesc.NodeMask = 0;
     ThrowIfFailed(_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(_dsvHeap.GetAddressOf())));
+
+    D3D12_DESCRIPTOR_HEAP_DESC srvDesc = {};
+    srvDesc.NumDescriptors = 1;
+    srvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    srvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    dsvHeapDesc.NodeMask = 0;
+    ThrowIfFailed(_device->CreateDescriptorHeap(&srvDesc, IID_PPV_ARGS(_srvHeap.GetAddressOf())));
 }
 
 void Device::CreateRenderTargetViews()

@@ -58,6 +58,7 @@ private:
 
     ComPtr<ID3D12DescriptorHeap> _rtvHeap;
     ComPtr<ID3D12DescriptorHeap> _dsvHeap;
+    ComPtr<ID3D12DescriptorHeap> _srvHeap;
 
     HWND _hWnd;
     uint32_t _clientWidth;

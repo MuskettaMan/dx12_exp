@@ -2,6 +2,9 @@
 #include "device.hpp"
 #include <util.hpp>
 #include <WindowsX.h>
+#include "backends/imgui_impl_win32.h"
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 App::App(HINSTANCE hInstance, int32_t showCommand)
 {
@@ -105,6 +108,9 @@ int App::Run()
 
 LRESULT App::WndProc(HWND hWnd, uint32_t msg, WPARAM wParam, LPARAM lParam)
 {
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
+        return true;
+
     App* app = reinterpret_cast<App*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
     if (app == nullptr)
         return DefWindowProc(hWnd, msg, wParam, lParam);
