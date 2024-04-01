@@ -1,12 +1,45 @@
 #include "device.hpp"
+
+#include <array>
+
 #include "util.hpp"
 #include <cassert>
+#include <d3dcompiler.h>
+
 #include "d3dx12.h"
 #include "directxmath.h"
 
 #include "imgui/imgui.h"
 #include "imgui/backends/imgui_impl_win32.h"
 #include "imgui/backends/imgui_impl_dx12.h"
+#include <iterator>
+#include <numbers>
+
+using namespace DirectX; 
+
+
+
+struct Vertex
+{
+    XMFLOAT3 position;
+    XMFLOAT4 color;
+};
+
+struct Vertex2
+{
+    XMFLOAT3 position;
+    XMFLOAT3 normal;
+    XMFLOAT2 tex0;
+    XMFLOAT2 tex1;
+};
+
+
+D3D12_INPUT_ELEMENT_DESC desc2[]{
+    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex2, position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,    0, offsetof(Vertex2, tex1),     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex2, normal),   D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, offsetof(Vertex2, tex0),     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+};
 
 Device::Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight) :
     _hWnd(hWnd),
@@ -45,10 +78,26 @@ Device::Device(HWND hWnd, uint32_t clientWidth, uint32_t clientHeight) :
     CreateDescriptorHeaps();
     CreateRenderTargetViews();
 
+    OnResize();
+
+    ThrowIfFailed(_commandList->Reset(_commandAllocator.Get(), nullptr));
+
+    BuildConstantBuffers();
+    BuildRootSignature();
+    BuildShadersAndInputLayout();
+    BuildBoxGeometry();
+    BuildPSO();
+
     ImGui_ImplWin32_Init(_hWnd);
     ImGui_ImplDX12_Init(_device.Get(), SWAP_CHAIN_BUFFER_COUNT, _backBufferFormat, _srvHeap.Get(), _srvHeap->GetCPUDescriptorHandleForHeapStart(), _srvHeap->GetGPUDescriptorHandleForHeapStart());
 
-    OnResize();
+
+    ThrowIfFailed(_commandList->Close());
+    ID3D12CommandList* cmdLists[] = { _commandList.Get() };
+    _commandQueue->ExecuteCommandLists(std::size(cmdLists), cmdLists);
+    
+
+    FlushCommandQueue();
 }
 
 Device::~Device()
@@ -63,52 +112,64 @@ Device::~Device()
 void Device::Draw()
 {
     ThrowIfFailed(_commandAllocator->Reset());
-    ThrowIfFailed(_commandList->Reset(_commandAllocator.Get(), nullptr));
+    ThrowIfFailed(_commandList->Reset(_commandAllocator.Get(), _pso.Get()));
+
+    _commandList->RSSetViewports(1, &_screenViewport);
+    _commandList->RSSetScissorRects(1, &_scissorRect);
 
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    using namespace DirectX;
-
-    static XMFLOAT4 c;
-    c.w = 1;
-    ImGui::Begin("Test");
-    ImGui::ColorPicker3("Clear color", &c.x);
+    static XMFLOAT4 backgroundColor;
+    backgroundColor.w = 1;
+    ImGui::Begin("Background color panel");
+    ImGui::ColorPicker3("Color", &backgroundColor.x);
     ImGui::End();
 
     ImGui::Render();
     
-    auto barrierToRenderTarget{ CD3DX12_RESOURCE_BARRIER::Transition(
+    _commandList->ResourceBarrier(1, &keep(CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
         D3D12_RESOURCE_STATE_PRESENT,
-        D3D12_RESOURCE_STATE_RENDER_TARGET) };
-    _commandList->ResourceBarrier(1, &barrierToRenderTarget);
+        D3D12_RESOURCE_STATE_RENDER_TARGET)));
 
-    _commandList->RSSetViewports(1, &_screenViewport);
-    _commandList->RSSetScissorRects(1, &_scissorRect);
 
-    _commandList->ClearRenderTargetView(CurrentBackBufferView(), &c.x, 0, nullptr);
+    _commandList->ClearRenderTargetView(CurrentBackBufferView(), &backgroundColor.x, 0, nullptr);
     _commandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
   
-    auto currentBackBufferView = CurrentBackBufferView();
-    auto depthStencilView = DepthStencilView();
-    _commandList->OMSetRenderTargets(1, &currentBackBufferView, true, &depthStencilView);
+    _commandList->OMSetRenderTargets(1, 
+                                     &keep(CurrentBackBufferView()), 
+                                     true, 
+                                     &keep(DepthStencilView()));
 
+
+
+
+    _commandList->SetDescriptorHeaps(1, _cbvHeap.GetAddressOf());
+    _commandList->SetGraphicsRootSignature(_rootSignature.Get());
+    _commandList->IASetVertexBuffers(0, 1, &keep(_boxGeo->VertexBufferView()));
+    _commandList->IASetIndexBuffer(&keep(_boxGeo->IndexBufferView()));
+    _commandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    _commandList->SetGraphicsRootDescriptorTable(0, _cbvHeap->GetGPUDescriptorHandleForHeapStart());
+
+    _commandList->DrawIndexedInstanced(_boxGeo->drawArgs["box"].indexCount, 1, 0, 0, 0);
+
+
+    
     _commandList->SetDescriptorHeaps(1, _srvHeap.GetAddressOf());
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), _commandList.Get());
 
-    auto barrierToPresent{ CD3DX12_RESOURCE_BARRIER::Transition(
+    _commandList->ResourceBarrier(1, &keep(CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(),
         D3D12_RESOURCE_STATE_RENDER_TARGET,
-        D3D12_RESOURCE_STATE_PRESENT)
-    };
-    _commandList->ResourceBarrier(1, &barrierToPresent);
+        D3D12_RESOURCE_STATE_PRESENT)));
 
     ThrowIfFailed(_commandList->Close());
 
     ID3D12CommandList* cmdsList[] = { _commandList.Get() };
-    _commandQueue->ExecuteCommandLists(static_cast<uint32_t>(std::size(cmdsList)), cmdsList);
+    _commandQueue->ExecuteCommandLists(std::size(cmdsList), cmdsList);
 
     ThrowIfFailed(_swapChain->Present(0, 0));
     _currentBackBuffer = (_currentBackBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
@@ -205,7 +266,6 @@ void Device::CreateSwapChain()
     DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainFSDesc = {};
     swapChainFSDesc.Windowed = TRUE;
 
-
     ThrowIfFailed(_dxgiFactory->CreateSwapChainForHwnd(
         _commandQueue.Get(), 
         _hWnd, 
@@ -237,6 +297,13 @@ void Device::CreateDescriptorHeaps()
     srvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     dsvHeapDesc.NodeMask = 0;
     ThrowIfFailed(_device->CreateDescriptorHeap(&srvDesc, IID_PPV_ARGS(_srvHeap.GetAddressOf())));
+
+    D3D12_DESCRIPTOR_HEAP_DESC cbvDesc;
+    cbvDesc.NumDescriptors = 1;
+    cbvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    cbvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    cbvDesc.NodeMask = 0;
+    ThrowIfFailed(_device->CreateDescriptorHeap(&cbvDesc, IID_PPV_ARGS(_cbvHeap.GetAddressOf())));
 }
 
 void Device::CreateRenderTargetViews()
@@ -295,6 +362,144 @@ void Device::SetViewport()
     _commandList->RSSetScissorRects(1, &_scissorRect);
 }
 
+void Device::BuildConstantBuffers()
+{
+    _uploadBuffer = std::make_unique<UploadBuffer<ObjectConstants>>(_device.Get(), _numElements, true);
+
+    std::uint32_t objCBByteSize = D3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+
+    D3D12_GPU_VIRTUAL_ADDRESS cbAddress = _uploadBuffer->Resource()->GetGPUVirtualAddress();
+
+    std::int32_t boxCBufferIndex = 0;
+    cbAddress += boxCBufferIndex * objCBByteSize;
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+    cbvDesc.BufferLocation = cbAddress;
+    cbvDesc.SizeInBytes = objCBByteSize;
+
+
+    _device->CreateConstantBufferView(&cbvDesc, _cbvHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
+void Device::BuildRootSignature()
+{
+    CD3DX12_ROOT_PARAMETER slotRootParameter[1];
+
+    CD3DX12_DESCRIPTOR_RANGE cbvTable;
+    cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+
+    slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
+
+    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc{ 1, slotRootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT };
+
+    ComPtr<ID3DBlob> serializedRootSig{ nullptr };
+    ComPtr<ID3DBlob> errorBlob{ nullptr };
+
+    HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+    if(errorBlob != nullptr)
+    {
+        OutputDebugStringA(static_cast<LPCSTR>(errorBlob->GetBufferPointer()));
+    }
+    ThrowIfFailed(hr);
+
+    ThrowIfFailed(_device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(), IID_PPV_ARGS(&_rootSignature)));
+}
+
+void Device::BuildShadersAndInputLayout()
+{
+    _vsByte = D3dUtil::CompileShader(L"assets\\shaders\\vs.hlsl", nullptr, "VS", "vs_5_0");
+    _psByte = D3dUtil::CompileShader(L"assets\\shaders\\vs.hlsl", nullptr, "PS", "ps_5_0");
+
+    _inputLayout = 
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, offsetof(Vertex, position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(Vertex, color),    D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+}
+
+void Device::BuildBoxGeometry()
+{
+    std::array vertices = {
+        Vertex{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        Vertex{ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        Vertex{ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        Vertex{ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        Vertex{ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        Vertex{ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        Vertex{ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        Vertex{ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+    };
+    std::array<uint16_t, 36> indices{
+        0, 1, 2,
+        0, 2, 3,
+
+        4, 6, 5,
+        4, 7, 6,
+
+        4, 5, 1,
+        4, 1, 0,
+
+        3, 2, 6,
+        3, 6, 7,
+
+        1, 5, 6,
+        1, 6, 2,
+
+        4, 0, 3,
+        4, 3, 7,
+    };
+
+    const uint32_t vbByteSize = vertices.size() * sizeof(Vertex);
+    const uint32_t ibByteSize = indices.size() * sizeof(uint16_t);
+
+    _boxGeo = std::make_unique<MeshGeometry>();
+    _boxGeo->name = "boxGeo";
+
+    ThrowIfFailed(D3DCreateBlob(vbByteSize, &_boxGeo->vertexBufferCPU));
+    CopyMemory(_boxGeo->vertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &_boxGeo->indexBufferCPU));
+    CopyMemory(_boxGeo->indexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+    _boxGeo->vertexBufferGPU = CreateDefaultBuffer(_device.Get(), _commandList.Get(), vertices.data(), vbByteSize, _boxGeo->vertexBufferUploader);
+    _boxGeo->indexBufferGPU = CreateDefaultBuffer(_device.Get(), _commandList.Get(), indices.data(), ibByteSize, _boxGeo->indexBufferUploader);
+
+    _boxGeo->vertexByteStride = sizeof(Vertex);
+    _boxGeo->vertexBufferByteSize = vbByteSize;
+    _boxGeo->indexFormat = DXGI_FORMAT_R16_UINT;
+    _boxGeo->indexBufferByteSize = ibByteSize;
+
+    SubmeshGeometry submesh;
+    submesh.indexCount = indices.size();
+    submesh.startIndexLocation = 0;
+    submesh.baseVertexLocation = 0;
+
+    _boxGeo->drawArgs["box"] = submesh;
+}
+
+void Device::BuildPSO()
+{
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
+    ZeroMemory(&psoDesc, sizeof(psoDesc));
+    psoDesc.InputLayout = { _inputLayout.data(), static_cast<uint32_t>(_inputLayout.size()) };
+    psoDesc.pRootSignature = _rootSignature.Get();
+    psoDesc.VS = { reinterpret_cast<BYTE*>(_vsByte->GetBufferPointer()), _vsByte->GetBufferSize() };
+    psoDesc.PS = { reinterpret_cast<BYTE*>(_psByte->GetBufferPointer()), _psByte->GetBufferSize() };
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC{ D3D12_DEFAULT };
+    psoDesc.BlendState = CD3DX12_BLEND_DESC{ D3D12_DEFAULT };
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC{ D3D12_DEFAULT };
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = _backBufferFormat;
+    psoDesc.SampleDesc.Count = 1;
+    psoDesc.SampleDesc.Quality = 0;
+    psoDesc.DSVFormat = _depthStencilFormat;
+
+    ThrowIfFailed(_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pso)));
+}
+
 void Device::FlushCommandQueue()
 {
     _currentFence++;
@@ -346,6 +551,7 @@ void Device::OnResize()
     _screenViewport.MinDepth = 0.0f;
     _screenViewport.MaxDepth = 0.0f;
     _scissorRect = { 0, 0, static_cast<long>(_clientWidth), static_cast<long>(_clientHeight) };
+
 }
 
 ID3D12Resource* Device::CurrentBackBuffer() const

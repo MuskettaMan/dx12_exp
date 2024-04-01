@@ -4,12 +4,23 @@
 #include <dxgi1_4.h>
 #include <wrl.h>
 #include <cstdint>
+#include <directxmath.h>
+#include <memory>
+#include <vector>
+
+#include "math_helper.hpp"
+#include "upload_buffer.hpp"
 
 using Microsoft::WRL::ComPtr;
 
 constexpr uint32_t SWAP_CHAIN_BUFFER_COUNT = 2;
 
 class App;
+
+struct ObjectConstants
+{
+    DirectX::XMFLOAT4X4 worldViewProj = MathHelper::Identity4x4();
+};
 
 class Device
 {
@@ -18,6 +29,13 @@ public:
     ~Device();
 
     void Draw();
+    void SetMVP(DirectX::XMMATRIX mvp)
+    {
+        _mvp = mvp;
+        ObjectConstants constants;
+        DirectX::XMStoreFloat4x4(&constants.worldViewProj, DirectX::XMMatrixTranspose(mvp));
+        _uploadBuffer->CopyData(0, constants);
+    }
 
 private:
     friend App;
@@ -33,6 +51,12 @@ private:
     void CreateRenderTargetViews();
     void CreateDepthStencilView();
     void SetViewport();
+
+    void BuildConstantBuffers();
+    void BuildRootSignature();
+    void BuildShadersAndInputLayout();
+    void BuildBoxGeometry();
+    void BuildPSO();
 
     void FlushCommandQueue();
     void OnResize();
@@ -56,9 +80,24 @@ private:
     ComPtr<ID3D12Resource> _swapChainBuffer[SWAP_CHAIN_BUFFER_COUNT];
     ComPtr<ID3D12Resource> _depthStencilBuffer;
 
+    ComPtr<ID3D12Resource> _vertexBuffer;
+    ComPtr<ID3D12Resource> _indexBuffer;
+
     ComPtr<ID3D12DescriptorHeap> _rtvHeap;
     ComPtr<ID3D12DescriptorHeap> _dsvHeap;
     ComPtr<ID3D12DescriptorHeap> _srvHeap;
+    ComPtr<ID3D12DescriptorHeap> _cbvHeap;
+
+    const uint32_t _numElements{1};
+    std::unique_ptr<UploadBuffer<ObjectConstants>> _uploadBuffer;
+    ComPtr<ID3D12RootSignature> _rootSignature;
+    std::unique_ptr<MeshGeometry> _boxGeo;
+
+    std::vector<D3D12_INPUT_ELEMENT_DESC> _inputLayout;
+    ComPtr<ID3DBlob> _vsByte;
+    ComPtr<ID3DBlob> _psByte;
+
+    ComPtr<ID3D12PipelineState> _pso;
 
     HWND _hWnd;
     uint32_t _clientWidth;
@@ -77,4 +116,6 @@ private:
 
     D3D12_VIEWPORT _screenViewport;
     RECT _scissorRect;
+
+    DirectX::XMMATRIX _mvp;
 };

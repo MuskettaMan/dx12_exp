@@ -1,5 +1,6 @@
 #pragma once
 
+#include <directxmath.h>
 #include <memory>
 #include <engine.hpp>
 #include <windows.h>
@@ -22,7 +23,7 @@ private:
 
 	virtual void OnMouseDown(WPARAM buttonState, int x, int y) {}
 	virtual void OnMouseUp(WPARAM buttonState, int x, int y) {}
-	virtual void OnMouseMove(WPARAM buttonState, int x, int y) {}
+	virtual void OnMouseMove(WPARAM buttonState, int x, int y);
 
 	static LRESULT WndProc(HWND hWnd, uint32_t msg, WPARAM wParam, LPARAM lParam);
 
@@ -34,4 +35,6 @@ private:
 	bool _minimized;
 	bool _maximized;
 	bool _resizing;
+
+	bool _initialized = false;
 };

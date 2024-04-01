@@ -3,6 +3,7 @@
 #include <util.hpp>
 #include <WindowsX.h>
 #include "imgui/backends/imgui_impl_win32.h"
+#include <numbers>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -20,6 +21,8 @@ App::App(HINSTANCE hInstance, int32_t showCommand)
         _device = std::make_shared<Device>(_mainWnd, INITIAL_WIDTH, INITIAL_HEIGHT);
         _engine = std::make_unique<Engine>(_device);
 
+        _initialized = true;
+
         Run();
     }
     catch (DxException& e)
@@ -27,6 +30,7 @@ App::App(HINSTANCE hInstance, int32_t showCommand)
         MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
         return;
     }
+
 }
 
 App::~App() = default;
@@ -106,14 +110,20 @@ int App::Run()
     return static_cast<int32_t>(msg.wParam);
 }
 
+void App::OnMouseMove(WPARAM buttonState, int x, int y)
+{
+    _engine->OnMouseMove(buttonState, x, y);
+}
+
 LRESULT App::WndProc(HWND hWnd, uint32_t msg, WPARAM wParam, LPARAM lParam)
 {
+    App* app = reinterpret_cast<App*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+    if (app == nullptr || !app->_initialized)
+        return DefWindowProc(hWnd, msg, wParam, lParam);
+
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
 
-    App* app = reinterpret_cast<App*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-    if (app == nullptr)
-        return DefWindowProc(hWnd, msg, wParam, lParam);
 
     switch (msg)
     {
