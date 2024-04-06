@@ -64,6 +64,7 @@ private:
     ID3D12Resource* CurrentBackBuffer() const;
 
     D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE CurrentMsaaBackBufferView() const;
     D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView() const;
 
     ComPtr<IDXGIFactory4> _dxgiFactory;
@@ -79,11 +80,13 @@ private:
     ComPtr<IDXGISwapChain1> _swapChain;
     ComPtr<ID3D12Resource> _swapChainBuffer[SWAP_CHAIN_BUFFER_COUNT];
     ComPtr<ID3D12Resource> _depthStencilBuffer;
+    ComPtr<ID3D12Resource> _offscreenRenderTargets[SWAP_CHAIN_BUFFER_COUNT];
 
     ComPtr<ID3D12Resource> _vertexBuffer;
     ComPtr<ID3D12Resource> _indexBuffer;
 
     ComPtr<ID3D12DescriptorHeap> _rtvHeap;
+    ComPtr<ID3D12DescriptorHeap> _rtvMsaaHeap;
     ComPtr<ID3D12DescriptorHeap> _dsvHeap;
     ComPtr<ID3D12DescriptorHeap> _srvHeap;
     ComPtr<ID3D12DescriptorHeap> _cbvHeap;
@@ -118,4 +121,5 @@ private:
     RECT _scissorRect;
 
     DirectX::XMMATRIX _mvp;
+    const DirectX::XMFLOAT4 backgroundColor{ 0.2f, 0.2f, 0.2f, 0.2f };
 };

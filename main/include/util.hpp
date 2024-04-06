@@ -88,16 +88,21 @@ struct MeshGeometry
 {
     std::string name;
     Microsoft::WRL::ComPtr<ID3DBlob> vertexBufferCPU = nullptr;
+    Microsoft::WRL::ComPtr<ID3DBlob> extraVertexBufferCPU = nullptr;
     Microsoft::WRL::ComPtr<ID3DBlob> indexBufferCPU = nullptr;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexBufferGPU = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> extraVertexBufferGPU = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferGPU = nullptr;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexBufferUploader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> extraVertexBufferUploader = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferUploader = nullptr;
 
     uint32_t vertexByteStride = 0;
     uint32_t vertexBufferByteSize = 0;
+    uint32_t extraVertexByteStride = 0;
+    uint32_t extraVertexBufferByteSize = 0;
     DXGI_FORMAT indexFormat = DXGI_FORMAT_R16_UINT;
     uint32_t indexBufferByteSize = 0;
 
@@ -112,6 +117,15 @@ struct MeshGeometry
 
         return vbv;
     }
+    D3D12_VERTEX_BUFFER_VIEW ExtraVertexBufferView() const
+    {
+        D3D12_VERTEX_BUFFER_VIEW evbv;
+        evbv.BufferLocation = extraVertexBufferGPU->GetGPUVirtualAddress();
+        evbv.StrideInBytes = extraVertexByteStride;
+        evbv.SizeInBytes = extraVertexBufferByteSize;
+
+        return evbv;
+    }
     D3D12_INDEX_BUFFER_VIEW IndexBufferView() const
     {
         D3D12_INDEX_BUFFER_VIEW ibv;
@@ -125,6 +139,7 @@ struct MeshGeometry
     void DisposeUploaders()
     {
         vertexBufferUploader = nullptr;
+        extraVertexBufferUploader = nullptr;
         indexBufferUploader = nullptr;
     }
 };

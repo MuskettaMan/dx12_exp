@@ -6,15 +6,16 @@
 
 Engine::Engine(std::shared_ptr<Device> device) : _device(device)
 {
-    DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(0.25f * std::numbers::pi_v<float>, 1920.0f / 1080.0f, 1.0f, 100.0f);
+    
+    DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, 1920.0f / 1080.0f, 0.1f, 100.0f);
     DirectX::XMStoreFloat4x4(&_projection, projection);
 }
 
 void Engine::Tick()
 {
     float x{ _radius * sinf(_phi) * cosf(_theta) };
-    float y{ _radius * sinf(_phi) * sinf(_theta) };
-    float z{ _radius * cosf(_phi) };
+    float z{ _radius * sinf(_phi) * sinf(_theta) };
+    float y{ _radius * cosf(_phi) };
 
     DirectX::XMVECTOR pos{ DirectX::XMVectorSet(x, y, z, 1.0f) };
     DirectX::XMVECTOR target{ DirectX::XMVectorZero() };
@@ -36,8 +37,8 @@ void Engine::OnMouseMove(WPARAM buttonState, int x, int y)
 {
     if ((buttonState & MK_LBUTTON) != 0)
     {
-        float dx{ DirectX::XMConvertToRadians(0.25f * static_cast<float>(y - _lastMousePosition.y)) };
-        float dy{ DirectX::XMConvertToRadians(0.25f * static_cast<float>(x - _lastMousePosition.x)) };
+        float dx{ DirectX::XMConvertToRadians(0.25f * static_cast<float>(x - _lastMousePosition.x)) };
+        float dy{ DirectX::XMConvertToRadians(0.25f * static_cast<float>(y - _lastMousePosition.y)) };
 
         _theta += dx;
         _phi += dy;
