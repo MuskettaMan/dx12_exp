@@ -2,7 +2,6 @@
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
-#include <wrl.h>
 #include <cstdint>
 #include <directxmath.h>
 #include <memory>
@@ -10,8 +9,7 @@
 
 #include "math_helper.hpp"
 #include "upload_buffer.hpp"
-
-using Microsoft::WRL::ComPtr;
+#include "fwd.hpp"
 
 constexpr uint32_t SWAP_CHAIN_BUFFER_COUNT = 2;
 
@@ -19,7 +17,7 @@ class App;
 
 struct ObjectConstants
 {
-    DirectX::XMFLOAT4X4 worldViewProj = MathHelper::Identity4x4();
+    XMFLOAT4X4 worldViewProj = MathHelper::Identity4x4();
 };
 
 class Device
@@ -29,11 +27,11 @@ public:
     ~Device();
 
     void Draw();
-    void SetMVP(DirectX::XMMATRIX mvp)
+    void SetMVP(XMMATRIX mvp)
     {
         _mvp = mvp;
         ObjectConstants constants;
-        DirectX::XMStoreFloat4x4(&constants.worldViewProj, DirectX::XMMatrixTranspose(mvp));
+        XMStoreFloat4x4(&constants.worldViewProj, XMMatrixTranspose(mvp));
         _uploadBuffer->CopyData(0, constants);
     }
 
@@ -120,6 +118,6 @@ private:
     D3D12_VIEWPORT _screenViewport;
     RECT _scissorRect;
 
-    DirectX::XMMATRIX _mvp;
-    const DirectX::XMFLOAT4 backgroundColor{ 0.2f, 0.2f, 0.2f, 0.2f };
+    XMMATRIX _mvp;
+    const XMFLOAT4 backgroundColor{ 0.2f, 0.2f, 0.2f, 0.2f };
 };

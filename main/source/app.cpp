@@ -1,9 +1,7 @@
+#include "precomp.hpp"
 #include "app.hpp"
 #include "device.hpp"
 #include <util.hpp>
-#include <WindowsX.h>
-#include "imgui/backends/imgui_impl_win32.h"
-#include <numbers>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 

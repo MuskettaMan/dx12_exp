@@ -1,21 +1,9 @@
+#include "precomp.hpp"
 #include "device.hpp"
 
-#include <array>
 
 #include "util.hpp"
-#include <cassert>
-#include <d3dcompiler.h>
 
-#include "d3dx12.h"
-#include "directxmath.h"
-
-#include "imgui/imgui.h"
-#include "imgui/backends/imgui_impl_win32.h"
-#include "imgui/backends/imgui_impl_dx12.h"
-#include <iterator>
-#include <numbers>
-
-using namespace DirectX; 
 
 struct Vertex
 {

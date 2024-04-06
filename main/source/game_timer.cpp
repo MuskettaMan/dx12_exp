@@ -1,5 +1,5 @@
+#include "precomp.hpp"
 #include "game_timer.hpp"
-#include <windows.h>
 
 GameTimer::GameTimer() :
 	_secondsPerCount(0.0),

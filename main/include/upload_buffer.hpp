@@ -1,10 +1,10 @@
 #pragma once
 #include <cstdint>
-#include <wrl/client.h>
 
 #include "d3d12.h"
 #include "d3dx12.h"
 #include "util.hpp"
+#include "fwd.hpp"
 
 template <typename T>
 class UploadBuffer
@@ -44,7 +44,7 @@ public:
     }
 
 private:
-    Microsoft::WRL::ComPtr<ID3D12Resource> _uploadBuffer;
+    ComPtr<ID3D12Resource> _uploadBuffer;
     BYTE* _mappedData;
 
     uint32_t _elementByteSize;

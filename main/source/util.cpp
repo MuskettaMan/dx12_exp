@@ -1,8 +1,5 @@
+#include "precomp.hpp"
 #include "util.hpp"
-#include <comdef.h>
-#include <d3dcompiler.h>
-#include <d3dx12.h>
-#include <fstream>
 
 DxException::DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber) :
     ErrorCode(hr),
@@ -21,9 +18,8 @@ std::wstring DxException::ToString() const
     return FunctionName + L" failed in " + Filename + L"; line " + std::to_wstring(LineNumber) + L"; error: " + msg;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const void* initData, uint64_t byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer)
+ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const void* initData, uint64_t byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer)
 {
-    using Microsoft::WRL::ComPtr;
     ComPtr<ID3D12Resource> defaultBuffer;
 
     // Create the buffer on the GPU.
@@ -52,11 +48,9 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device,
     return defaultBuffer;
 }
 
-Microsoft::WRL::ComPtr<ID3DBlob> D3dUtil::CompileShader(const std::wstring& fileName, const D3D_SHADER_MACRO* defines,
+ComPtr<ID3DBlob> D3dUtil::CompileShader(const std::wstring& fileName, const D3D_SHADER_MACRO* defines,
     const std::string& entryPoint, const std::string& target)
 {
-    using Microsoft::WRL::ComPtr;
-
     std::uint32_t compileFlags{ 0 };
 #if defined(_DEBUG)
     compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -77,7 +71,7 @@ Microsoft::WRL::ComPtr<ID3DBlob> D3dUtil::CompileShader(const std::wstring& file
     return byteCode;
 }
 
-Microsoft::WRL::ComPtr<ID3DBlob> D3dUtil::LoadBinary(const std::wstring& fileName)
+ComPtr<ID3DBlob> D3dUtil::LoadBinary(const std::wstring& fileName)
 {
     std::ifstream fin{ fileName, std::ios::binary };
 
@@ -85,7 +79,7 @@ Microsoft::WRL::ComPtr<ID3DBlob> D3dUtil::LoadBinary(const std::wstring& fileNam
     std::ifstream::pos_type size = fin.tellg();
     fin.seekg(0, std::ios_base::beg);
 
-    Microsoft::WRL::ComPtr<ID3DBlob> blob;
+    ComPtr<ID3DBlob> blob;
     ThrowIfFailed(D3DCreateBlob(size, blob.GetAddressOf()));
 
     fin.read(static_cast<char*>(blob->GetBufferPointer()), size);

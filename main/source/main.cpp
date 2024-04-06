@@ -1,10 +1,5 @@
+#include "precomp.hpp"
 #include <app.hpp>
-
-#include <cstdint>
-#include <windows.h>
-#include <util.hpp>
-#include <cassert>
-#include <sstream>
 
 std::unique_ptr<App> app;
 

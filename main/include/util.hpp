@@ -1,10 +1,11 @@
 #pragma once
-#include <wrl.h>
-#include <string>
-#include <d3d12.h>
-#include <DirectXCollision.h>
-#include <unordered_map>
 
+#include <DirectXCollision.h>
+#include <string>
+#include <unordered_map>
+#include <wrl/client.h>
+
+#include "fwd.hpp"
 
 template <class T>
 constexpr auto& keep(T&& x) noexcept
@@ -42,7 +43,7 @@ public:
 }
 #endif
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const void* initData, uint64_t byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer);
+ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const void* initData, uint64_t byteSize, ComPtr<ID3D12Resource>& uploadBuffer);
 
 #define NON_COPYABLE(classname) \
         classname(const classname&) = delete; \
@@ -72,8 +73,8 @@ public:
         return (byteSize + 255) & ~255;
     }
 
-    static Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(const std::wstring& fileName, const D3D_SHADER_MACRO* defines, const std::string& entryPoint, const std::string& target);
-    static Microsoft::WRL::ComPtr<ID3DBlob> LoadBinary(const std::wstring& fileName);
+    static ComPtr<ID3DBlob> CompileShader(const std::wstring& fileName, const D3D_SHADER_MACRO* defines, const std::string& entryPoint, const std::string& target);
+    static ComPtr<ID3DBlob> LoadBinary(const std::wstring& fileName);
 };
 
 struct SubmeshGeometry
@@ -81,23 +82,23 @@ struct SubmeshGeometry
     uint32_t indexCount = 0;
     uint32_t startIndexLocation = 0;
     int32_t baseVertexLocation = 0;
-    DirectX::BoundingBox bounds;
+    BoundingBox bounds;
 };
 
 struct MeshGeometry
 {
     std::string name;
-    Microsoft::WRL::ComPtr<ID3DBlob> vertexBufferCPU = nullptr;
-    Microsoft::WRL::ComPtr<ID3DBlob> extraVertexBufferCPU = nullptr;
-    Microsoft::WRL::ComPtr<ID3DBlob> indexBufferCPU = nullptr;
+    ComPtr<ID3DBlob> vertexBufferCPU = nullptr;
+    ComPtr<ID3DBlob> extraVertexBufferCPU = nullptr;
+    ComPtr<ID3DBlob> indexBufferCPU = nullptr;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> vertexBufferGPU = nullptr;
-    Microsoft::WRL::ComPtr<ID3D12Resource> extraVertexBufferGPU = nullptr;
-    Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferGPU = nullptr;
+    ComPtr<ID3D12Resource> vertexBufferGPU = nullptr;
+    ComPtr<ID3D12Resource> extraVertexBufferGPU = nullptr;
+    ComPtr<ID3D12Resource> indexBufferGPU = nullptr;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> vertexBufferUploader = nullptr;
-    Microsoft::WRL::ComPtr<ID3D12Resource> extraVertexBufferUploader = nullptr;
-    Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferUploader = nullptr;
+    ComPtr<ID3D12Resource> vertexBufferUploader = nullptr;
+    ComPtr<ID3D12Resource> extraVertexBufferUploader = nullptr;
+    ComPtr<ID3D12Resource> indexBufferUploader = nullptr;
 
     uint32_t vertexByteStride = 0;
     uint32_t vertexBufferByteSize = 0;

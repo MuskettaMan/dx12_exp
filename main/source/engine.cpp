@@ -1,6 +1,5 @@
+#include "precomp.hpp"
 #include "engine.hpp"
-
-#include <numbers>
 
 #include "device.hpp"
 
@@ -11,7 +10,7 @@ Engine::Engine(std::shared_ptr<Device> device) : _device(device)
     DirectX::XMStoreFloat4x4(&_projection, projection);
 }
 
-void Engine::Tick()
+void Engine::Tick() 
 {
     float x{ _radius * sinf(_phi) * cosf(_theta) };
     float z{ _radius * sinf(_phi) * sinf(_theta) };
